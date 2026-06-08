@@ -170,29 +170,4 @@ CREATE POLICY "knowledge: tenant members can CRUD" ON knowledge_chunks
     tenant_id = (SELECT tenant_id FROM users WHERE id = auth.uid())
   );
 
--- --------------------------------------------------
--- Helper functions
--- --------------------------------------------------
-CREATE OR REPLACE FUNCTION hash_share_token(text)
-RETURNS text AS $$
-  SELECT encode(sha256(concat($1, current_setting('app.token_salt', true) DEFAULT ''::text))::bytea, 'hex')
-$$ LANGUAGE SQL SECURITY INVOKER;
-
--- Search function: find knowledge chunks matching a query
-CREATE OR REPLACE FUNCTION search_knowledge(query_embedding vector(1536), match_count int DEFAULT 5)
-RETURNS TABLE (
-  id BIGSERIAL PRIMARY KEY,
-  source_file TEXT,
-  content TEXT,
-  similarity DOUBLE PRECISION
-) LANGUAGE sql SECURITY DEFINER AS $$
-  SELECT
-    kc.id,
-    kc.source_file,
-    kc.content,
-    1 - (kc.embedding <=> query_embedding) AS similarity
-  FROM knowledge_chunks kc
-  WHERE kc.tenant_id = (SELECT tenant_id FROM users WHERE id = auth.uid())
-  ORDER BY kc.embedding <=> query_embedding
-  LIMIT match_count;
-$$;
+-- Note: hash_share_token and search_knowledge functions are handled in the API layer.
