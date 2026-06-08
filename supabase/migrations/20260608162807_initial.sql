@@ -93,7 +93,7 @@ INSERT INTO slide_templates (slide_type, layout, fields) VALUES
 -- Presentations
 -- --------------------------------------------------
 CREATE TABLE presentations (
-  id BIGSERIAL,
+  id BIGSERIAL PRIMARY KEY,
   tenant_id UUID NOT NULL REFERENCES tenants(id),
   title TEXT NOT NULL DEFAULT 'Untitled',
   description TEXT DEFAULT '',
@@ -125,7 +125,7 @@ CREATE POLICY "presentations: tenant members can CRUD" ON presentations
 -- Presentation Revisions
 -- --------------------------------------------------
 CREATE TABLE presentation_revisions (
-  id BIGSERIAL,
+  id BIGSERIAL PRIMARY KEY,
   presentation_id BIGINT NOT NULL REFERENCES presentations(id) ON DELETE CASCADE,
   sequence INTEGER NOT NULL DEFAULT 1,
   content JSONB NOT NULL,
@@ -152,7 +152,7 @@ CREATE POLICY "revisions_public: readable when presentation is shared" ON presen
 -- Knowledge Chunks (with vector embeddings)
 -- --------------------------------------------------
 CREATE TABLE knowledge_chunks (
-  id BIGSERIAL,
+  id BIGSERIAL PRIMARY KEY,
   tenant_id UUID NOT NULL REFERENCES tenants(id),
   source_file TEXT,
   chunk_index INTEGER NOT NULL DEFAULT 0,
@@ -181,7 +181,7 @@ $$ LANGUAGE SQL SECURITY INVOKER;
 -- Search function: find knowledge chunks matching a query
 CREATE OR REPLACE FUNCTION search_knowledge(query_embedding vector(1536), match_count int DEFAULT 5)
 RETURNS TABLE (
-  id BIGSERIAL,
+  id BIGSERIAL PRIMARY KEY,
   source_file TEXT,
   content TEXT,
   similarity DOUBLE PRECISION
