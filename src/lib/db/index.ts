@@ -5,13 +5,11 @@ let db: ReturnType<typeof createClient<Database>>;
 
 export function getDB() {
   if (!db) {
-    const url = process.env.DATABASE_URL;
-    const key = process.env.DATABASE_SERVICE_KEY;
-    if (!url) throw new Error('DATABASE_URL not set');
-    db = createClient<Database>(url, key ?? '', {
-      db: {
-        transform: { values: { keepCase: false } },
-      },
+    const url = import.meta.env.VITE_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+    const key = import.meta.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_KEY;
+    if (!url || !key) throw new Error('VITE_SUPABASE_URL and SUPABASE_SERVICE_KEY required');
+    db = createClient<Database>(url, key, {
+      db: { transform: { values: { keepCase: false } } },
     });
   }
   return db;

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useAuth } from '../../lib/auth.tsx';
 
-export const Route = createFileRoute('/app')({
+export const Route = createFileRoute('/app/')({
   component: AppDashboard,
 });
 

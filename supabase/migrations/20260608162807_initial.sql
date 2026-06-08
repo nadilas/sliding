@@ -108,7 +108,8 @@ CREATE TABLE presentations (
   published_at TIMESTAMPTZ,
   confidential BOOLEAN NOT NULL DEFAULT false,
   view_count INTEGER NOT NULL DEFAULT 0,
-  latest_revision_id BIGINT
+  latest_revision_id BIGINT,
+  revoked_at TIMESTAMPTZ
 );
 
 

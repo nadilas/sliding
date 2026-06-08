@@ -1,51 +1,57 @@
 import { createAPIRoute } from '@tanstack/start';
 import { getDB } from '../../../lib/db/index.ts';
-import { verify } from 'jose';
+import { createClient } from '@supabase/supabase-js';
 
 export const GET = createAPIRoute(async ({ request }) => {
-  const cookie = request.headers.get('cookie') || '';
-  const sessionToken = getCookieValue(cookie, 'session_token');
+  const url = import.meta.env.VITE_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const serviceKey = import.meta.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_KEY;
 
-  if (!sessionToken) {
+  if (!url || !serviceKey) {
+    return new Response(JSON.stringify({ error: 'Supabase not configured' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const supabase = createClient(url, serviceKey);
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+  if (authError || !user) {
     return new Response(JSON.stringify({ error: 'Not authenticated' }), {
       status: 401,
       headers: { 'Content-Type': 'application/json' },
     });
   }
 
-  try {
-    const decoded = await verify(
-      sessionToken,
-      new Uint8Array(Buffer.from(process.env.BETTER_AUTH_SECRET || 'dev-secret-change', 'utf-8')),
-    ) as { sub: string; tenant_id: string };
+  const { data: dbUser } = await getDB()
+    .from('users')
+    .select('tenant_id')
+    .eq('id', user.id)
+    .maybeSingle();
 
-    const { data, error } = await getDB()
-      .from('presentations')
-      .select(
-        'id, title, description, share_token, created_at, updated_at, published_at, view_count, confidential, latest_revision_id',
-      )
-      .eq('tenant_id', decoded.tenant_id)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      return new Response(JSON.stringify({ error: error.message }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
-    return new Response(JSON.stringify({ presentations: data }), {
-      headers: { 'Content-Type': 'application/json' },
-    });
-  } catch {
-    return new Response(JSON.stringify({ error: 'Invalid session' }), {
-      status: 401,
+  if (!dbUser) {
+    return new Response(JSON.stringify({ error: 'User not found' }), {
+      status: 404,
       headers: { 'Content-Type': 'application/json' },
     });
   }
-});
 
-function getCookieValue(cookie: string, name: string) {
-  const match = cookie.match(new RegExp(`_auth_session=${([^;]*)}`));
-  return match?.[1];
-}
+  const { data, error } = await getDB()
+    .from('presentations')
+    .select(
+      'id, title, description, share_token, created_at, updated_at, published_at, view_count, confidential, latest_revision_id',
+    )
+    .eq('tenant_id', dbUser.tenant_id)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  return new Response(JSON.stringify({ presentations: data }), {
+    headers: { 'Content-Type': 'application/json' },
+  });
+});

@@ -1,6 +1,7 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
+import { supabase } from '../utils/supabase';
 
-interface AuthUser {
+interface DBUser {
   id: string;
   tenant_id: string;
   email: string;
@@ -9,62 +10,80 @@ interface AuthUser {
 }
 
 interface AuthContextType {
-  user: AuthUser | null;
-  sessionToken: string | null;
+  user: DBUser | null;
   loading: boolean;
   error: string | null;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, name: string, tenantName: string) => Promise<void>;
-  signOut: () => void;
+  signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [sessionToken, setSessionToken] = useState<string | null>(
-    typeof window !== 'undefined' ? localStorage.getItem('session_token') : null,
-  );
-  const [loading, setLoading] = useState(false);
+  const [user, setUser] = useState<DBUser | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Load user on mount
-  useState(() => {
-    if (sessionToken) {
-      fetch('/api/auth/me')
-        .then((res) => {
-          if (res.ok) return res.json();
-          throw new Error('Invalid session');
-        })
-        .then((data) => {
-          setUser(data.user);
-        })
-        .catch(() => {
-          localStorage.removeItem('session_token');
-          setSessionToken(null);
-        });
-    }
-  });
+  useEffect(() => {
+    let mounted = true;
+
+    const init = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!mounted) return;
+
+      if (session) {
+        const { data: dbUser } = await supabase
+          .from('users')
+          .select('id, tenant_id, email, name, role')
+          .eq('id', session.user.id)
+          .maybeSingle();
+
+        if (dbUser && mounted) {
+          setUser(dbUser);
+        } else {
+          // No users table entry — session is invalid for this app
+          await supabase.auth.signOut();
+        }
+      }
+      setLoading(false);
+    };
+
+    init();
+
+    const { data: listener } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!mounted) return;
+
+      if (session) {
+        const { data: dbUser } = await supabase
+          .from('users')
+          .select('id, tenant_id, email, name, role')
+          .eq('id', session.user.id)
+          .maybeSingle();
+
+        if (dbUser) {
+          setUser(dbUser);
+        } else {
+          await supabase.auth.signOut();
+        }
+      } else {
+        setUser(null);
+      }
+      setLoading(false);
+    });
+
+    return () => {
+      mounted = false;
+      listener.subscription.unsubscribe();
+    };
+  }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/auth/sign-in', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Sign in failed');
-      }
-
-      const data = await res.json();
-      setUser(data.user);
-      setSessionToken(data.sessionToken);
-      localStorage.setItem('session_token', data.sessionToken);
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign in failed');
       throw err;
@@ -77,21 +96,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/auth/sign-up', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, name, tenantName }),
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { name, tenant_name: tenantName },
+        },
       });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Sign up failed');
-      }
-
-      const data = await res.json();
-      setUser(data.user);
-      setSessionToken(data.sessionToken);
-      localStorage.setItem('session_token', data.sessionToken);
+      if (error) throw error;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign up failed');
       throw err;
@@ -100,16 +112,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const signOut = useCallback(() => {
-    setUser(null);
-    setSessionToken(null);
-    localStorage.removeItem('session_token');
+  const signOut = useCallback(async () => {
+    await supabase.auth.signOut();
   }, []);
 
   return (
-    <AuthContext.Provider
-      value={{ user, sessionToken, loading, error, signIn, signUp, signOut }}
-    >
+    <AuthContext.Provider value={{ user, loading, error, signIn, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   );

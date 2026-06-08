@@ -10,7 +10,7 @@ import {
   SlideConclusion,
 } from '../../components/slides/index.tsx';
 
-export const Route = createFileRoute('/p/[token]')({
+export const Route = createFileRoute('/p/token')({
   component: ExecutiveView,
 });
 
