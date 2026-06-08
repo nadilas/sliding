@@ -13,15 +13,7 @@ CREATE TABLE tenants (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-
-CREATE POLICY "tenants: members can view" ON tenants
-  FOR SELECT USING (
-    EXISTS (
-      SELECT 1 FROM users
-      WHERE users.tenant_id = tenants.id
-        AND users.id = auth.uid()
-    )
-  );
+-- Note: RLS is enabled by default. Access controlled via users table policies.
 
 -- --------------------------------------------------
 -- Users
