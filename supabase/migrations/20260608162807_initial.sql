@@ -13,7 +13,6 @@ CREATE TABLE tenants (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-ALTER TABLE tenants SET (force_security);
 
 CREATE POLICY "tenants: members can view" ON tenants
   FOR SELECT USING (
@@ -39,7 +38,6 @@ CREATE TABLE users (
   UNIQUE(tenant_id, email)
 );
 
-ALTER TABLE users SET (force_security);
 
 CREATE POLICY "users: members can view own tenant" ON users
   FOR SELECT USING (
@@ -62,7 +60,6 @@ CREATE TABLE slide_templates (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-ALTER TABLE slide_templates SET (force_security);
 
 CREATE POLICY "templates: anyone can read" ON slide_templates
   FOR SELECT USING (true);
@@ -122,7 +119,6 @@ CREATE TABLE presentations (
   latest_revision_id BIGINT
 );
 
-ALTER TABLE presentations SET (force_security);
 
 CREATE INDEX idx_presentations_tenant ON presentations(tenant_id);
 CREATE INDEX idx_presentations_share_token ON presentations(share_token);
@@ -147,7 +143,6 @@ CREATE TABLE presentation_revisions (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-ALTER TABLE presentation_revisions SET (force_security);
 
 CREATE INDEX idx_revisions_presentation ON presentation_revisions(presentation_id, sequence DESC);
 
@@ -174,7 +169,6 @@ CREATE TABLE knowledge_chunks (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-ALTER TABLE knowledge_chunks SET (force_security);
 
 CREATE INDEX idx_knowledge_tenant ON knowledge_chunks(tenant_id);
 CREATE INDEX idx_knowledge_embedding ON knowledge_chunks USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
